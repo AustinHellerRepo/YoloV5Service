@@ -1,0 +1,4 @@
+train: /app/training/images/
+val: /app/validation/images/
+
+# number of classes
