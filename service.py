@@ -8,6 +8,7 @@ import os
 import shutil
 from datetime import datetime
 import inspect
+import time
 from austin_heller_repo.socket_queued_message_framework import SourceTypeEnum, ClientServerMessage, ClientServerMessageTypeEnum, StructureStateEnum, StructureTransitionException, Structure, StructureFactory, StructureInfluence
 from austin_heller_repo.threading import Semaphore, start_thread
 from austin_heller_repo.common import StringEnum, SubprocessWrapper, is_directory_empty
@@ -429,29 +430,36 @@ class ServiceStructure(Structure):
 				training_weights_file_name = ""
 				if os.path.exists(os.path.join(self.__model_directory_path, "training.pt")):
 					training_weights_file_name = "training.pt"
-					print(f"Found existing training weights")
+					print(f"{datetime.utcnow()}: {inspect.stack()[0][3]}: Found existing training weights")
 				else:
-					print(f"Failed to find existing training weights")
+					print(f"{datetime.utcnow()}: {inspect.stack()[0][3]}: Failed to find existing training weights")
 
-				if
-				self.__training_subprocess_wrapper = SubprocessWrapper(
-					command="sh",
-					arguments=[self.__training_script_file_path, str(self.__image_size), str(self.__training_batch_size), str(self.__training_epochs), training_weights_file_name]
-				)
-				training_output = self.__training_subprocess_wrapper.run()
-				print(f"Training output: {training_output}")
-				# TODO save output to log
+				if is_directory_empty(os.path.join(self.__training_directory_path, "images")):
+					print(f"{datetime.utcnow()}: {inspect.stack()[0][3]}: Failed to find training images.")
+					time.sleep(1.0)
+				elif is_directory_empty(os.path.join(self.__validation_directory_path, "images")):
+					print(f"{datetime.utcnow()}: {inspect.stack()[0][3]}: Failed to find validation images.")
+					time.sleep(1.0)
+				else:
+					self.__training_subprocess_wrapper = SubprocessWrapper(
+						command="sh",
+						arguments=[self.__training_script_file_path, str(self.__image_size), str(self.__training_batch_size), str(self.__training_epochs), training_weights_file_name]
+					)
+					training_output = self.__training_subprocess_wrapper.run()
+					print(f"{datetime.utcnow()}: {inspect.stack()[0][3]}: Training output: (start)\n{training_output}")
+					print(f"{datetime.utcnow()}: {inspect.stack()[0][3]}: Training output: (end)")
+					# TODO save output to log
 
-				# TODO ensure that training weights are saved to appropriate file path
+					# TODO ensure that training weights are saved to appropriate file path
 
-				self.__training_subprocess_wrapper = None
+					self.__training_subprocess_wrapper = None
 
-				self.__detection_model_semaphore.acquire()
-				try:
-					# replace detect model with trained model
-					shutil.copy(self.__training_model_file_path, self.__detection_model_file_path)
-				finally:
-					self.__detection_model_semaphore.release()
+					self.__detection_model_semaphore.acquire()
+					try:
+						# replace detect model with trained model
+						shutil.copy(self.__training_model_file_path, self.__detection_model_file_path)
+					finally:
+						self.__detection_model_semaphore.release()
 		except Exception as ex:
 			print(f"{datetime.utcnow()}: {inspect.stack()[0][3]}: ex: {ex}")
 			raise

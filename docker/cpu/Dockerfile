@@ -19,18 +19,20 @@ RUN pip install \
 
 RUN mkdir -p /app/scripts
 RUN mkdir -p /app/temp_images
-RUN mkdir -p /app/training
-RUN mkdir -p /app/validation
+RUN mkdir -p /app/training/images
+RUN mkdir -p /app/training/annotations
+RUN mkdir -p /app/validation/images
+RUN mkdir -p /app/validation/annotations
 RUN mkdir -p /app/models
 
 WORKDIR /app
 
-COPY parent/main.py ./main.py
-COPY parent/service.py ./service.py
+COPY ./main.py ./main.py
+COPY ./service.py ./service.py
 
 WORKDIR /app/scripts
 
-COPY parent/scripts/train.sh ./train.sh
-COPY parent/scripts/detect.sh ./detect.sh
+COPY ./scripts/train.sh ./train.sh
+COPY ./scripts/detect.sh ./detect.sh
 
 CMD ["sh", "-c", "python /app/main.py ${image_size} ${training_batch_size} ${training_epochs} ${label_classes_total}"]
