@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 import sys
 import time
+from datetime import datetime
 from austin_heller_repo.socket_queued_message_framework import ServerMessenger, ServerSocketFactory, HostPointer
 
 try:
@@ -11,7 +12,7 @@ except ImportError:
 
 
 if len(sys.argv) != 5:
-	print(f"Failed to provide expected arguments: main.py [image size integer] [training_batch_size] [training_epochs] [label_classes_total]")
+	print(f"{datetime.utcnow()}: script: Failed to provide expected arguments: main.py [image size integer] [training_batch_size] [training_epochs] [label_classes_total]")
 else:
 
 	image_size = int(sys.argv[1])

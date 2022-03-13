@@ -1,1 +1,0 @@
-docker run --name yolov5_service_gpu -e image_size=2048 -e training_batch_size=1 -e training_epochs=3 .

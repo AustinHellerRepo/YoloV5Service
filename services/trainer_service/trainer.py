@@ -10,7 +10,7 @@ from datetime import datetime
 import inspect
 import time
 import base64
-from austin_heller_repo.socket_queued_message_framework import SourceTypeEnum, ClientServerMessage, ClientServerMessageTypeEnum, StructureStateEnum, StructureTransitionException, Structure, StructureFactory, StructureInfluence
+from austin_heller_repo.socket_queued_message_framework import SourceTypeEnum, ClientServerMessage, ClientServerMessageTypeEnum, StructureStateEnum, StructureTransitionException, Structure, StructureFactory, StructureInfluence, ReadWriteSocketClosedException
 from austin_heller_repo.threading import Semaphore, start_thread
 from austin_heller_repo.common import StringEnum, SubprocessWrapper, is_directory_empty
 
@@ -286,7 +286,7 @@ class TrainerStructure(Structure):
 	def on_client_connected(self, *, source_uuid: str, source_type: SourceTypeEnum, tag_json: Dict or None):
 		if source_type == TrainerSourceTypeEnum.ImageSource:
 			# image source structure not needed at the moment
-			print(f"Image source connected.")
+			print(f"{datetime.utcnow()}: TrainerStructure: on_client_connected: Image source connected.")
 			pass
 		elif source_type == TrainerSourceTypeEnum.Detector:
 			detector_structure = DetectorStructure(
@@ -355,38 +355,73 @@ class TrainerStructure(Structure):
 
 				# run training process
 
-				training_weights_file_name = ""
-				if os.path.exists(os.path.join(self.__model_directory_path, "training.pt")):
-					training_weights_file_name = "training.pt"
+				training_weights_file_path = os.path.join(self.__model_directory_path, "training.pt")
+				if os.path.exists(training_weights_file_path):
 					if self.__is_debug:
-						print(f"{datetime.utcnow()}: {inspect.stack()[0][3]}: Found existing training weights")
+						print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: Found existing training weights")
 				else:
+					training_weights_file_path = ""
 					if self.__is_debug:
-						print(f"{datetime.utcnow()}: {inspect.stack()[0][3]}: Failed to find existing training weights")
+						print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: Failed to find existing training weights")
 
-				if is_directory_empty(os.path.join(self.__training_directory_path, "images")):
+				training_images_directory_path = os.path.join(self.__training_directory_path, "images")
+				validation_images_directory_path = os.path.join(self.__validation_directory_path, "images")
+				if is_directory_empty(training_images_directory_path):
 					if self.__is_debug:
-						print(f"{datetime.utcnow()}: {inspect.stack()[0][3]}: Failed to find training images.")
-				elif is_directory_empty(os.path.join(self.__validation_directory_path, "images")):
+						print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: Failed to find training images at directory {training_images_directory_path}.")
+				elif is_directory_empty(validation_images_directory_path):
 					if self.__is_debug:
-						print(f"{datetime.utcnow()}: {inspect.stack()[0][3]}: Failed to find validation images.")
+						print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: Failed to find validation images at directory {validation_images_directory_path}.")
 				else:
 					self.__training_subprocess_wrapper = SubprocessWrapper(
 						command="sh",
-						arguments=[self.__training_script_file_path, str(self.__image_size), str(self.__training_batch_size), str(self.__training_epochs), training_weights_file_name]
+						arguments=[self.__training_script_file_path, str(self.__image_size), str(self.__training_batch_size), str(self.__training_epochs), training_weights_file_path]
 					)
 					training_output = self.__training_subprocess_wrapper.run()
 					if self.__is_debug:
-						print(f"{datetime.utcnow()}: {inspect.stack()[0][3]}: Training output: (start)")
-						print(f"{datetime.utcnow()}: {inspect.stack()[0][3]}: Training output: {training_output}")
-						print(f"{datetime.utcnow()}: {inspect.stack()[0][3]}: Training output: (end)")
+						print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: Training output: (start)")
+						print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: Training output: {training_output}")
+						print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: Training output: (end)")
 					# TODO save output to log
 
-					# TODO ensure that training weights are saved to appropriate file path
+					# ensure that training weights are saved to appropriate file path
+					destination_last_model_file_path = None
+					for line in training_output.split("\n"):
+						if line.startswith("Optimizer stripped from ../yolov5/runs/train/exp") and "last.pt" in line:
+							source_last_model_file_path = os.path.join("/app", line[27:line.index("last.pt")], "last.pt")
+							destination_last_model_file_path = "/app/models/training.pt"
+							if self.__is_debug:
+								print(f"Saving model from {source_last_model_file_path} to {destination_last_model_file_path}")
+							shutil.copy(source_last_model_file_path, destination_last_model_file_path)
+							break
 
 					self.__training_subprocess_wrapper = None
 
-					# TODO get trained weights file path to send to detectors
+					if destination_last_model_file_path is None:
+						print(f"Failed to find latest model.")
+					else:
+						# get trained weights file path to send to detectors
+						self.__detector_structure_per_source_uuid_semaphore.acquire()
+						try:
+							with open(destination_last_model_file_path, "rb") as file_handle:
+								model_bytes = file_handle.read()
+
+							disconnected_detector_source_uuids = []  # type: List[str]
+							for source_uuid, detector_structure in self.__detector_structure_per_source_uuid.items():
+								try:
+									detector_structure.send_updated_model(
+										model_bytes=model_bytes
+									)
+								except ReadWriteSocketClosedException as ex:
+									disconnected_detector_source_uuids.append(source_uuid)
+								except Exception as ex:
+									print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: ex: {ex}")
+
+							for source_uuid in disconnected_detector_source_uuids:
+								del self.__detector_structure_per_source_uuid[source_uuid]
+
+						finally:
+							self.__detector_structure_per_source_uuid_semaphore.release()
 
 				time.sleep(3.0)
 
