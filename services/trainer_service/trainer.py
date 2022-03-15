@@ -188,6 +188,9 @@ class DetectorStructure(Structure):
 
 		self.__source_uuid = source_uuid
 
+	def on_client_connected(self, *, source_uuid: str, source_type: SourceTypeEnum, tag_json: Dict or None):
+		raise Exception(f"Unexpected connection from source {source_type.value}")
+
 	def send_updated_model(self, *, model_bytes: bytes):
 		self.send_client_server_message(
 			client_server_message=UpdateModelBroadcastTrainerClientServerMessage(
@@ -355,8 +358,8 @@ class TrainerStructure(Structure):
 
 				# run training process
 
-				training_weights_file_path = os.path.join(self.__model_directory_path, "training.pt")
-				if os.path.exists(training_weights_file_path):
+				if os.path.exists(self.__training_model_file_path):
+					training_weights_file_path = self.__training_model_file_path
 					if self.__is_debug:
 						print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: Found existing training weights")
 				else:
@@ -377,11 +380,13 @@ class TrainerStructure(Structure):
 						command="sh",
 						arguments=[self.__training_script_file_path, str(self.__image_size), str(self.__training_batch_size), str(self.__training_epochs), training_weights_file_path]
 					)
-					training_output = self.__training_subprocess_wrapper.run()
 					if self.__is_debug:
-						print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: Training output: (start)")
+						print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: Training shell script: (start)")
+					exit_code, training_output = self.__training_subprocess_wrapper.run()
+					if self.__is_debug:
+						print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: Training exit code: {exit_code}")
 						print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: Training output: {training_output}")
-						print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: Training output: (end)")
+						print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: Training shell script: (end)")
 					# TODO save output to log
 
 					# ensure that training weights are saved to appropriate file path
@@ -391,16 +396,20 @@ class TrainerStructure(Structure):
 							source_last_model_file_path = os.path.join("/app", line[27:line.index("last.pt")], "last.pt")
 							destination_last_model_file_path = "/app/models/training.pt"
 							if self.__is_debug:
-								print(f"Saving model from {source_last_model_file_path} to {destination_last_model_file_path}")
+								print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: saving model from {source_last_model_file_path} to {destination_last_model_file_path}")
 							shutil.copy(source_last_model_file_path, destination_last_model_file_path)
 							break
 
 					self.__training_subprocess_wrapper = None
 
 					if destination_last_model_file_path is None:
-						print(f"Failed to find latest model.")
+						print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: failed to find latest model.")
 					else:
 						# get trained weights file path to send to detectors
+
+						if self.__is_debug:
+							print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: broadcasting updated model to detectors.")
+
 						self.__detector_structure_per_source_uuid_semaphore.acquire()
 						try:
 							with open(destination_last_model_file_path, "rb") as file_handle:
@@ -412,7 +421,11 @@ class TrainerStructure(Structure):
 									detector_structure.send_updated_model(
 										model_bytes=model_bytes
 									)
+									if self.__is_debug:
+										print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: broadcasted updated model to detector {source_uuid}.")
 								except ReadWriteSocketClosedException as ex:
+									if self.__is_debug:
+										print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: disconnected from detector {source_uuid}.")
 									disconnected_detector_source_uuids.append(source_uuid)
 								except Exception as ex:
 									print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: ex: {ex}")
@@ -423,7 +436,7 @@ class TrainerStructure(Structure):
 						finally:
 							self.__detector_structure_per_source_uuid_semaphore.release()
 
-				time.sleep(3.0)
+				time.sleep(10.0)
 
 		except Exception as ex:
 			print(f"{datetime.utcnow()}: {inspect.stack()[0][3]}: ex: {ex}")

@@ -17,22 +17,21 @@ RUN pip install \
     git+https://github.com/AustinHellerRepo/SocketQueuedMessageFramework \
     torch==1.10.2+cpu torchvision==0.11.3+cpu torchaudio==0.10.2+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html
 
+ARG CACHEBUST=1
+RUN echo "$CACHEBUST"
+
 RUN mkdir -p /app/scripts
 RUN mkdir -p /app/temp_images
-RUN mkdir -p /app/training/images
-RUN mkdir -p /app/training/annotations
-RUN mkdir -p /app/validation/images
-RUN mkdir -p /app/validation/annotations
 RUN mkdir -p /app/models
 
 WORKDIR /app
 
-COPY ./main.py ./main.py
-COPY ./service.py ./service.py
+COPY ./services/detector_service/main.py ./main.py
+COPY ./services/detector_service/detector.py ./detector.py
+COPY ./services/trainer_service/trainer.py ./trainer.py
 
 WORKDIR /app/scripts
 
-COPY ./scripts/train.sh ./train.sh
-COPY ./scripts/detect.sh ./detect.sh
+COPY ./services/detector_service/docker/scripts/detect.sh ./detect.sh
 
-CMD ["sh", "-c", "python /app/main.py ${image_size} ${training_batch_size} ${training_epochs} ${label_classes_total}"]
+CMD ["sh", "-c", "python /app/main.py ${image_size} ${label_classes_total}"]

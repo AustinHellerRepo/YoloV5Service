@@ -43,6 +43,15 @@ else:
 					host_address="0.0.0.0",
 					host_port=31982
 				)
+			),
+			TrainerSourceTypeEnum.Detector: (
+				ServerSocketFactory(
+					is_debug=False
+				),
+				HostPointer(
+					host_address="0.0.0.0",
+					host_port=31984
+				)
 			)
 		},
 		client_server_message_class=TrainerClientServerMessage,

@@ -3,10 +3,10 @@ rm -f /home/austin/Projects_Unversioned/YoloV5Service/trainer/training/labels.ca
 docker rm yolov5_trainer_cpu
 docker run \
   --name yolov5_trainer_cpu \
-  -p 31982:31982 \
+  --network host \
   -e image_size=2048 \
   -e training_batch_size=1 \
-  -e training_epochs=3 \
+  -e training_epochs=100 \
   -e label_classes_total=2 \
   -v $HOME/Projects_Unversioned/YoloV5Service/trainer/temp_images:/app/temp_images \
   -v $HOME/Projects_Unversioned/YoloV5Service/trainer/training:/app/training \

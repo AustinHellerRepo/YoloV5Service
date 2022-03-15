@@ -3,7 +3,7 @@ rm -f /home/austin/Projects_Unversioned/YoloV5Service/trainer/training/labels.ca
 docker rm yolov5_trainer_gpu
 docker run \
   --name yolov5_trainer_gpu \
-  -p 31982:31982 \
+  --network host \
   -e image_size=2048 \
   -e training_batch_size=1 \
   -e training_epochs=3 \
