@@ -1,4 +1,5 @@
 FROM nvcr.io/nvidia/pytorch:21.10-py3
+#FROM anibali/pytorch:1.8.1-cuda11.1-ubuntu20.04
 
 RUN apt update && apt install -y zip htop screen libgl1-mesa-glx
 RUN python -m pip install --upgrade pip
