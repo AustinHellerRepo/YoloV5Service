@@ -38,4 +38,4 @@ WORKDIR /app/scripts
 
 COPY ./services/trainer_service/docker/scripts/train.sh ./train.sh
 
-CMD ["sh", "-c", "python /app/main.py ${image_size} ${training_batch_size} ${training_epochs} ${label_classes_total}"]
+CMD ["sh", "-c", 'python /app/main.py ${image_size} ${training_batch_size} ${training_epochs} ${label_classes_total} "/app/training" "/app/validation" "/app/models" "/app/temp_images" "/app/scripts" "/app/yolov5" "0.0.0.0" ${image_source_port} ${detector_port}']

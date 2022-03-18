@@ -202,7 +202,7 @@ class DetectorStructure(Structure):
 
 class TrainerStructure(Structure):
 
-	def __init__(self, *, script_directory_path: str, temp_image_directory_path: str, training_directory_path: str, validation_directory_path: str, model_directory_path: str, image_size: int, training_batch_size: int, training_epochs: int, is_debug: bool = False):
+	def __init__(self, *, script_directory_path: str, temp_image_directory_path: str, training_directory_path: str, validation_directory_path: str, model_directory_path: str, yolov5_directory_path: str, image_size: int, training_batch_size: int, training_epochs: int, is_debug: bool = False):
 		super().__init__(
 			states=TrainerStructureStateEnum,
 			initial_state=TrainerStructureStateEnum.Active
@@ -213,6 +213,7 @@ class TrainerStructure(Structure):
 		self.__training_directory_path = training_directory_path
 		self.__validation_directory_path = validation_directory_path
 		self.__model_directory_path = model_directory_path
+		self.__yolov5_directory_path = yolov5_directory_path
 		self.__image_size = image_size
 		self.__training_batch_size = training_batch_size
 		self.__training_epochs = training_epochs
@@ -376,9 +377,10 @@ class TrainerStructure(Structure):
 					if self.__is_debug:
 						print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: Failed to find validation images at directory {validation_images_directory_path}.")
 				else:
+					training_python_file_path = os.path.join(self.__yolov5_directory_path, "train.py")
 					self.__training_subprocess_wrapper = SubprocessWrapper(
 						command="sh",
-						arguments=[self.__training_script_file_path, str(self.__image_size), str(self.__training_batch_size), str(self.__training_epochs), training_weights_file_path]
+						arguments=[self.__training_script_file_path, training_python_file_path, str(self.__image_size), str(self.__training_batch_size), str(self.__training_epochs), training_weights_file_path]
 					)
 					if self.__is_debug:
 						print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: Training shell script: (start)")
@@ -392,9 +394,15 @@ class TrainerStructure(Structure):
 					# ensure that training weights are saved to appropriate file path
 					destination_last_model_file_path = None
 					for line in training_output.split("\n"):
+						path_index = None
 						if line.startswith("Optimizer stripped from ../yolov5/runs/train/exp") and "last.pt" in line:
-							source_last_model_file_path = os.path.join("/app", line[27:line.index("last.pt")], "last.pt")
-							destination_last_model_file_path = "/app/models/training.pt"
+							path_index = 34
+						elif line.startswith("Optimizer stripped from yolov5/runs/train/exp") and "last.pt" in line:
+							path_index = 31
+
+						if path_index is not None:
+							source_last_model_file_path = os.path.join(self.__yolov5_directory_path, line[path_index:line.index("last.pt")], "last.pt")
+							destination_last_model_file_path = os.path.join(self.__model_directory_path, "training.pt")
 							if self.__is_debug:
 								print(f"{datetime.utcnow()}: TrainerStructure: {inspect.stack()[0][3]}: saving model from {source_last_model_file_path} to {destination_last_model_file_path}")
 							shutil.copy(source_last_model_file_path, destination_last_model_file_path)
@@ -451,13 +459,14 @@ class TrainerStructure(Structure):
 
 class TrainerStructureFactory(StructureFactory):
 
-	def __init__(self, *, script_directory_path: str, temp_image_directory_path: str, training_directory_path: str, validation_directory_path: str, model_directory_path: str, image_size: int, training_batch_size: int, training_epochs: int, is_debug: bool = False):
+	def __init__(self, *, script_directory_path: str, temp_image_directory_path: str, training_directory_path: str, validation_directory_path: str, model_directory_path: str, yolov5_directory_path: str, image_size: int, training_batch_size: int, training_epochs: int, is_debug: bool = False):
 
 		self.__script_directory_path = script_directory_path
 		self.__temp_image_directory_path = temp_image_directory_path
 		self.__training_directory_path = training_directory_path
 		self.__validation_directory_path = validation_directory_path
 		self.__model_directory_path = model_directory_path
+		self.__yolov5_directory_path = yolov5_directory_path
 		self.__image_size = image_size
 		self.__training_batch_size = training_batch_size
 		self.__training_epochs = training_epochs
@@ -470,6 +479,7 @@ class TrainerStructureFactory(StructureFactory):
 			training_directory_path=self.__training_directory_path,
 			validation_directory_path=self.__validation_directory_path,
 			model_directory_path=self.__model_directory_path,
+			yolov5_directory_path=self.__yolov5_directory_path,
 			image_size=self.__image_size,
 			training_batch_size=self.__training_batch_size,
 			training_epochs=self.__training_epochs,

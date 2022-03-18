@@ -8,6 +8,8 @@ docker run \
   -e training_batch_size=1 \
   -e training_epochs=100 \
   -e label_classes_total=2 \
+  -e image_source_port=32854 \
+  -e detector_port=32856 \
   -v $HOME/Projects_Unversioned/YoloV5Service/trainer/temp_images:/app/temp_images \
   -v $HOME/Projects_Unversioned/YoloV5Service/trainer/training:/app/training \
   -v $HOME/Projects_Unversioned/YoloV5Service/trainer/validation:/app/validation \

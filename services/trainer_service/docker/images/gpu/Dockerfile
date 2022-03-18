@@ -37,6 +37,6 @@ COPY ./services/trainer_service/trainer.py ./trainer.py
 
 WORKDIR /app/scripts
 
-COPY ./services/trainer_service/docker/scripts/train.sh ./train.sh
+COPY ./services/trainer_service/scripts/train.sh ./train.sh
 
 CMD ["sh", "-c", "python /app/main.py ${image_size} ${training_batch_size} ${training_epochs} ${label_classes_total}"]
