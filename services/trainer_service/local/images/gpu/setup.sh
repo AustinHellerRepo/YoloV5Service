@@ -11,7 +11,13 @@ mkdir -p temp_images/validation
 mkdir models
 mkdir scripts
 python -m venv venv
-source ./venv/bin/activate
+if [ -d "./venv/bin" ]
+then
+	source ./venv/bin/activate
+else
+	source ./venv/Scripts/activate
+fi
+pip install --upgrade pip
 pip install -r ./yolov5/requirements.txt
 pip install \
     albumentations wandb gsutil notebook \

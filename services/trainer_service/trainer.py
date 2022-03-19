@@ -394,13 +394,8 @@ class TrainerStructure(Structure):
 					# ensure that training weights are saved to appropriate file path
 					destination_last_model_file_path = None
 					for line in training_output.split("\n"):
-						path_index = None
-						if line.startswith("Optimizer stripped from ../yolov5/runs/train/exp") and "last.pt" in line:
-							path_index = 34
-						elif line.startswith("Optimizer stripped from yolov5/runs/train/exp") and "last.pt" in line:
-							path_index = 31
-
-						if path_index is not None:
+						if line.startswith("Optimizer stripped from") and "last.pt" in line:
+							path_index = line.index("runs")
 							source_last_model_file_path = os.path.join(self.__yolov5_directory_path, line[path_index:line.index("last.pt")], "last.pt")
 							destination_last_model_file_path = os.path.join(self.__model_directory_path, "training.pt")
 							if self.__is_debug:
